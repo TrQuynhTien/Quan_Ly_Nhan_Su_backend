@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
 using QuanLyNhanSu.API.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace QuanLyNhanSu.API.Controllers
 {
@@ -16,15 +17,15 @@ namespace QuanLyNhanSu.API.Controllers
             _context = context;
         }
 
-        // GET: api/ChucVu
         [HttpGet]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<ChucVu>>> GetChucVus()
         {
             return await _context.ChucVus.ToListAsync();
         }
 
-        // GET: api/ChucVu/1
         [HttpGet("{id}")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<ChucVu>> GetChucVu(int id)
         {
             var chucVu = await _context.ChucVus.FindAsync(id);
@@ -37,8 +38,8 @@ namespace QuanLyNhanSu.API.Controllers
             return chucVu;
         }
 
-        // POST: api/ChucVu
         [HttpPost]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
         public async Task<ActionResult<ChucVu>> CreateChucVu(ChucVu chucVu)
         {
             _context.ChucVus.Add(chucVu);
@@ -51,8 +52,8 @@ namespace QuanLyNhanSu.API.Controllers
             );
         }
 
-        // PUT: api/ChucVu/1
         [HttpPut("{id}")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
         public async Task<IActionResult> UpdateChucVu(int id, ChucVu chucVu)
         {
             if (id != chucVu.MaCV)
@@ -82,8 +83,8 @@ namespace QuanLyNhanSu.API.Controllers
             return NoContent();
         }
 
-        // DELETE: api/ChucVu/1
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
         public async Task<IActionResult> DeleteChucVu(int id)
         {
             var chucVu = await _context.ChucVus.FindAsync(id);

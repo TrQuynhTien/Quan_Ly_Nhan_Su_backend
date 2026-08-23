@@ -6,60 +6,62 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace QuanLyNhanSu.API.Controllers
 {
-    [Route("api/trinh-dos")]
+    [Route("api/nhan-viens")]
     [ApiController]
-    public class TrinhDoController : ControllerBase
+    public class NhanVienController : ControllerBase
     {
         private readonly QuanLyNhanSuDbContext _context;
 
-        public TrinhDoController(QuanLyNhanSuDbContext context)
+        public NhanVienController(QuanLyNhanSuDbContext context)
         {
             _context = context;
         }
 
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<ActionResult<IEnumerable<TrinhDo>>> GetAll()
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
+        public async Task<ActionResult<IEnumerable<NhanVien>>> GetAll()
         {
-            return await _context.TrinhDos.ToListAsync();
+            return await _context.NhanViens.ToListAsync();
         }
-        [HttpGet("{id}")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<ActionResult<TrinhDo>> GetById(int id)
-        {
-            var trinhDo = await _context.TrinhDos.FindAsync(id);
 
-            if (trinhDo == null)
+        [HttpGet("{id}")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
+        public async Task<ActionResult<NhanVien>> GetById(int id)
+        {
+            var nhanVien = await _context.NhanViens.FindAsync(id);
+
+            if (nhanVien == null)
             {
                 return NotFound();
             }
 
-            return trinhDo;
+            return nhanVien;
         }
+
         [HttpPost]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<ActionResult<TrinhDo>> Create(TrinhDo trinhDo)
+        public async Task<ActionResult<NhanVien>> Create(NhanVien nhanVien)
         {
-            _context.TrinhDos.Add(trinhDo);
+            _context.NhanViens.Add(nhanVien);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(
                 nameof(GetById),
-                new { id = trinhDo.MaTD },
-                trinhDo
+                new { id = nhanVien.MaNV },
+                nhanVien
             );
         }
-   
+
         [HttpPut("{id}")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<IActionResult> Update(int id, TrinhDo trinhDo)
+        public async Task<IActionResult> Update(int id, NhanVien nhanVien)
         {
-            if (id != trinhDo.MaTD)
+            if (id != nhanVien.MaNV)
             {
                 return BadRequest();
             }
 
-            _context.Entry(trinhDo).State = EntityState.Modified;
+            _context.Entry(nhanVien).State = EntityState.Modified;
 
             try
             {
@@ -67,7 +69,8 @@ namespace QuanLyNhanSu.API.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                var exists = await _context.TrinhDos.AnyAsync(x => x.MaTD == id);
+                var exists = await _context.NhanViens
+                    .AnyAsync(x => x.MaNV == id);
 
                 if (!exists)
                 {
@@ -84,14 +87,14 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
         public async Task<IActionResult> Delete(int id)
         {
-            var trinhDo = await _context.TrinhDos.FindAsync(id);
+            var nhanVien = await _context.NhanViens.FindAsync(id);
 
-            if (trinhDo == null)
+            if (nhanVien == null)
             {
                 return NotFound();
             }
 
-            _context.TrinhDos.Remove(trinhDo);
+            _context.NhanViens.Remove(nhanVien);
             await _context.SaveChangesAsync();
 
             return NoContent();

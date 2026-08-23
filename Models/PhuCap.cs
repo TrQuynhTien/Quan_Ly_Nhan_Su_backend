@@ -3,18 +3,19 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace QuanLyNhanSu.API.Models
 {
-    [Table("CHUCVU")]
-    public class ChucVu
+    [Table("PHUCAP")]
+    public class PhuCap
     {
         [Key]
-        public int MaCV { get; set; }
+        public int MaPC { get; set; }
 
         [Required]
         [StringLength(100)]
-        public string TenCV { get; set; } = string.Empty;
+        public string TenPC { get; set; } = string.Empty;
+
+        public decimal SoTien { get; set; }
 
         [StringLength(255)]
         public string? MoTa { get; set; }
-
     }
 }
