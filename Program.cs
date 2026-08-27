@@ -13,10 +13,11 @@ builder.Services.AddDbContext<QuanLyNhanSuDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")
     )
 );
-builder.Services.AddScoped<ThongKeService>();
-builder.Services.AddScoped<BangLuongService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<NghiPhepService>();
+builder.Services.AddScoped<BangLuongService>();
+builder.Services.AddScoped<ThongKeService>();
+builder.Services.AddHttpClient<AiService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
