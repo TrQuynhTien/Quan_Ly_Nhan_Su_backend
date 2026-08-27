@@ -1,9 +1,5 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
-using QuanLyNhanSu.API.Models;
-using QuanLyNhanSu.API.Services;
 
 namespace QuanLyNhanSu.API.Services
 {
@@ -15,14 +11,19 @@ namespace QuanLyNhanSu.API.Services
         {
             _context = context;
         }
-        public async Task<bool> ApproveLeaveRequestAsync(int maNP, int nguoiDuyet)
+        public async Task<string> ApproveLeaveRequestAsync(int maNP, int nguoiDuyet)
         {
             var nghiPhep = await _context.NghiPheps
                 .FirstOrDefaultAsync(x => x.MaNP == maNP);
 
             if (nghiPhep == null)
             {
-                return false;
+                return "NOT_FOUND";
+            }
+
+            if (nghiPhep.TrangThai != "Chờ duyệt")
+            {
+                return "ALREADY_PROCESSED";
             }
 
             nghiPhep.TrangThai = "Đã duyệt";
@@ -30,16 +31,21 @@ namespace QuanLyNhanSu.API.Services
 
             await _context.SaveChangesAsync();
 
-            return true;
+            return "SUCCESS";
         }
-        public async Task<bool> RejectLeaveRequestAsync(int maNP, int nguoiDuyet)
+        public async Task<string> RejectLeaveRequestAsync(int maNP, int nguoiDuyet)
         {
             var nghiPhep = await _context.NghiPheps
                 .FirstOrDefaultAsync(x => x.MaNP == maNP);
 
             if (nghiPhep == null)
             {
-                return false;
+                return "NOT_FOUND";
+            }
+
+            if (nghiPhep.TrangThai != "Chờ duyệt")
+            {
+                return "ALREADY_PROCESSED";
             }
 
             nghiPhep.TrangThai = "Từ chối";
@@ -47,7 +53,7 @@ namespace QuanLyNhanSu.API.Services
 
             await _context.SaveChangesAsync();
 
-            return true;
+            return "SUCCESS";
         }
     }
 }

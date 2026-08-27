@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
 using QuanLyNhanSu.API.Models;
 using QuanLyNhanSu.API.Services;
+using QuanLyNhanSu.API.DTOs;
 
 namespace QuanLyNhanSu.API.Controllers
 {
@@ -40,35 +41,83 @@ namespace QuanLyNhanSu.API.Controllers
         }
         [HttpPut("{id}/approve")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng")]
-        public async Task<IActionResult> Approve(int id, int nguoiDuyet)
+        public async Task<IActionResult> Approve(int id)
         {
-            var success = await _nghiPhepService
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int nguoiDuyet = int.Parse(maNVClaim);
+
+            var result = await _nghiPhepService
                 .ApproveLeaveRequestAsync(id, nguoiDuyet);
 
-            if (!success)
+            if (result == "NOT_FOUND")
             {
-                return NotFound();
+                return NotFound("Không tìm thấy đơn nghỉ phép");
+            }
+
+            if (result == "ALREADY_PROCESSED")
+            {
+                return Conflict("Đơn nghỉ phép đã được xử lý");
             }
 
             return NoContent();
         }
         [HttpPut("{id}/reject")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng")]
-        public async Task<IActionResult> Reject(int id, int nguoiDuyet)
+        public async Task<IActionResult> Reject(int id)
         {
-            var success = await _nghiPhepService
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int nguoiDuyet = int.Parse(maNVClaim);
+
+            var result = await _nghiPhepService
                 .RejectLeaveRequestAsync(id, nguoiDuyet);
 
-            if (!success)
+            if (result == "NOT_FOUND")
             {
-                return NotFound();
+                return NotFound("Không tìm thấy đơn nghỉ phép");
+            }
+
+            if (result == "ALREADY_PROCESSED")
+            {
+                return Conflict("Đơn nghỉ phép đã được xử lý");
             }
 
             return NoContent();
         }
         [HttpPost]
-        public async Task<ActionResult<NghiPhep>> Create(NghiPhep nghiPhep)
+        public async Task<ActionResult<NghiPhep>> Create(CreateNghiPhepRequest request)
         {
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int maNV = int.Parse(maNVClaim);
+
+            var nghiPhep = new NghiPhep
+            {
+                MaNV = maNV,
+                MaLoaiNP = request.MaLoaiNP,
+                TuNgay = request.TuNgay,
+                DenNgay = request.DenNgay,
+                LyDo = request.LyDo,
+                TrangThai = "Chờ duyệt",
+                NguoiDuyet = null
+            };
+
             _context.NghiPheps.Add(nghiPhep);
             await _context.SaveChangesAsync();
 

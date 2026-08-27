@@ -38,14 +38,22 @@ namespace QuanLyNhanSu.API.Services
                 return null;
             }
 
-            return CreateToken(taiKhoan.TenDangNhap, quyen.TenQuyen);
+            return CreateToken(
+                taiKhoan.TenDangNhap,
+                quyen.TenQuyen,
+                taiKhoan.MaNV
+            );
         }
-        private string CreateToken(string tenDangNhap, string tenQuyen)
+        private string CreateToken(
+            string tenDangNhap,
+            string tenQuyen,
+            int maNV)
         {
             var claims = new[]
             {
                 new Claim(ClaimTypes.Name, tenDangNhap),
-                new Claim(ClaimTypes.Role, tenQuyen)
+                new Claim(ClaimTypes.Role, tenQuyen),
+                new Claim("MaNV", maNV.ToString())
             };
 
             var key = new SymmetricSecurityKey(
