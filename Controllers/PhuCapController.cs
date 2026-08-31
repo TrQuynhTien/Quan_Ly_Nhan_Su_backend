@@ -18,14 +18,14 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc,Nhân viên")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<PhuCap>>> GetAll()
         {
             return await _context.PhuCaps.ToListAsync();
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc,Nhân viên")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<PhuCap>> GetById(int id)
         {
             var phuCap = await _context.PhuCaps.FindAsync(id);

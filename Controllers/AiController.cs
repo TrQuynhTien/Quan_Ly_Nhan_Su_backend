@@ -17,7 +17,7 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpPost("ask")]
-        [Authorize]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<IActionResult> Ask(AiQuestionRequest request)
         {
             var result = await _aiService.AskAsync(request.Question);

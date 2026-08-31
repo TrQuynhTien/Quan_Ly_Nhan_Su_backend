@@ -1,8 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
 using QuanLyNhanSu.API.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace QuanLyNhanSu.API.Controllers
 {
@@ -21,7 +21,65 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<ChamCong>>> GetAll()
         {
-            return await _context.ChamCongs.ToListAsync();
+            if (User.IsInRole("Trưởng phòng"))
+            {
+                var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+                if (maNVClaim == null)
+                {
+                    return Unauthorized();
+                }
+
+                int maNV = int.Parse(maNVClaim);
+
+                var truongPhong = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+                if (truongPhong == null)
+                {
+                    return NotFound("Không tìm thấy thông tin trưởng phòng.");
+                }
+
+                var danhSach = await _context.ChamCongs
+                    .Join(
+                        _context.NhanViens,
+                        cc => cc.MaNV,
+                        nv => nv.MaNV,
+                        (cc, nv) => new
+                        {
+                            ChamCong = cc,
+                            MaPB = nv.MaPB
+                        }
+                    )
+                    .Where(x => x.MaPB == truongPhong.MaPB)
+                    .Select(x => x.ChamCong)
+                    .ToListAsync();
+
+                return Ok(danhSach);
+            }
+
+            return Ok(await _context.ChamCongs.ToListAsync());
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<ChamCong>>> GetMyAttendance()
+        {
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int maNV = int.Parse(maNVClaim);
+
+            var danhSach = await _context.ChamCongs
+                .Where(x => x.MaNV == maNV)
+                .OrderByDescending(x => x.NgayChamCong)
+                .ToListAsync();
+
+            return Ok(danhSach);
         }
 
         [HttpGet("{id}")]
@@ -35,7 +93,35 @@ namespace QuanLyNhanSu.API.Controllers
                 return NotFound();
             }
 
-            return chamCong;
+            if (User.IsInRole("Trưởng phòng"))
+            {
+                var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+                if (maNVClaim == null)
+                {
+                    return Unauthorized();
+                }
+
+                int maNV = int.Parse(maNVClaim);
+
+                var truongPhong = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+                var nhanVien = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == chamCong.MaNV);
+
+                if (truongPhong == null || nhanVien == null)
+                {
+                    return NotFound();
+                }
+
+                if (truongPhong.MaPB != nhanVien.MaPB)
+                {
+                    return Forbid();
+                }
+            }
+
+            return Ok(chamCong);
         }
 
         [HttpPost]
@@ -54,7 +140,9 @@ namespace QuanLyNhanSu.API.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán")]
-        public async Task<IActionResult> Update(int id, ChamCong chamCong)
+        public async Task<IActionResult> Update(
+            int id,
+            ChamCong chamCong)
         {
             if (id != chamCong.MaCC)
             {
@@ -69,7 +157,10 @@ namespace QuanLyNhanSu.API.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!await _context.ChamCongs.AnyAsync(x => x.MaCC == id))
+                var exists = await _context.ChamCongs
+                    .AnyAsync(x => x.MaCC == id);
+
+                if (!exists)
                 {
                     return NotFound();
                 }

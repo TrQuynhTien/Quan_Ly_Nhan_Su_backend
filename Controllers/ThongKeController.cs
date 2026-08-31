@@ -23,8 +23,9 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(result);
         }
+
         [HttpGet("quy-luong")]
-        [Authorize(Roles = "Quản trị viên,Kế toán,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<IActionResult> GetPayrollByMonth(
             int thang,
             int nam)
@@ -34,6 +35,7 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(result);
         }
+
         [HttpGet("cham-cong")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<IActionResult> GetAttendanceByMonth(
@@ -45,8 +47,9 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(result);
         }
+
         [HttpGet("nghi-phep")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<IActionResult> GetLeaveByMonth(
             int thang,
             int nam)
@@ -56,8 +59,9 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(result);
         }
+
         [HttpGet("nhan-vien-theo-phong-ban")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<IActionResult> GetEmployeesByDepartment()
         {
             var result = await _thongKeService
@@ -65,8 +69,9 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(result);
         }
+
         [HttpGet("nhan-vien-theo-chuc-vu")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<IActionResult> GetEmployeesByPosition()
         {
             var result = await _thongKeService
@@ -74,8 +79,9 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(result);
         }
+
         [HttpGet("nhan-vien-theo-trang-thai")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<IActionResult> GetEmployeesByStatus()
         {
             var result = await _thongKeService
@@ -83,8 +89,9 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(result);
         }
+
         [HttpGet("hop-dong-sap-het-han")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<IActionResult> GetExpiringContracts()
         {
             var result = await _thongKeService

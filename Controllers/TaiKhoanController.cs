@@ -19,6 +19,7 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet]
+        [Authorize(Roles = "Quản trị viên")]    
         public async Task<ActionResult<IEnumerable<TaiKhoanResponse>>> GetTaiKhoans()
         {
             var taiKhoans = await _context.TaiKhoans

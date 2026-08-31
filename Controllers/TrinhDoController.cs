@@ -18,14 +18,14 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<TrinhDo>>> GetAll()
         {
             return await _context.TrinhDos.ToListAsync();
         }
         [HttpGet("{id}")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<ActionResult<TrinhDo>> GetById(int id)
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
+        public async Task<ActionResult<TrinhDo>> GetById(int id)   
         {
             var trinhDo = await _context.TrinhDos.FindAsync(id);
 

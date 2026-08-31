@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using QuanLyNhanSu.API.Services;
 using QuanLyNhanSu.API.DTOs;
+using QuanLyNhanSu.API.Services;
 
 namespace QuanLyNhanSu.API.Controllers
 {
@@ -14,24 +14,26 @@ namespace QuanLyNhanSu.API.Controllers
         {
             _authService = authService;
         }
-    
-    [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginRequest request)
-    {
-        var token = await _authService.LoginAsync(
-            request.TenDangNhap,
-            request.MatKhau
-        );
 
-        if (token == null)
+        [HttpPost("login")]
+        public async Task<IActionResult> Login(LoginRequest request)
         {
-            return Unauthorized("Tên đăng nhập hoặc mật khẩu không đúng");
+            var token = await _authService.LoginAsync(
+                request.TenDangNhap,
+                request.MatKhau
+            );
+
+            if (token == null)
+            {
+                return Unauthorized(
+                    "Tên đăng nhập hoặc mật khẩu không đúng"
+                );
+            }
+
+            return Ok(new
+            {
+                token
+            });
         }
-
-        return Ok(new
-        {
-            token = token
-        });
-    }
     }
 }

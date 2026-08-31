@@ -18,14 +18,14 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Ban giám đốc,Nhân viên")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<KhenThuongKyLuat>>> GetAll()
         {
             return await _context.KhenThuongKyLuats.ToListAsync();
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Ban giám đốc,Nhân viên")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<KhenThuongKyLuat>> GetById(int id)
         {
             var khenThuongKyLuat =
@@ -37,6 +37,27 @@ namespace QuanLyNhanSu.API.Controllers
             }
 
             return khenThuongKyLuat;
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<KhenThuongKyLuat>>> GetMyRecords()
+        {
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int maNV = int.Parse(maNVClaim);
+
+            var danhSach = await _context.KhenThuongKyLuats
+                .Where(x => x.MaNV == maNV)
+                .OrderByDescending(x => x.NgayQuyetDinh)
+                .ToListAsync();
+
+            return Ok(danhSach);
         }
 
         [HttpPost]

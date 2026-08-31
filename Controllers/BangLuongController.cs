@@ -1,8 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
 using QuanLyNhanSu.API.Models;
-using Microsoft.AspNetCore.Authorization;
 using QuanLyNhanSu.API.Services;
 
 namespace QuanLyNhanSu.API.Controllers
@@ -23,14 +23,36 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Kế toán,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<BangLuong>>> GetAll()
         {
             return await _context.BangLuongs.ToListAsync();
         }
 
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<BangLuong>>> GetMyPayroll()
+        {
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int maNV = int.Parse(maNVClaim);
+
+            var bangLuongs = await _context.BangLuongs
+                .Where(x => x.MaNV == maNV)
+                .OrderByDescending(x => x.Nam)
+                .ThenByDescending(x => x.Thang)
+                .ToListAsync();
+
+            return Ok(bangLuongs);
+        }
+
         [HttpGet("{id}")]
-        [Authorize(Roles = "Quản trị viên,Kế toán,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Ban giám đốc")]
         public async Task<ActionResult<BangLuong>> GetById(int id)
         {
             var bangLuong = await _context.BangLuongs.FindAsync(id);
@@ -76,6 +98,7 @@ namespace QuanLyNhanSu.API.Controllers
             {
                 return Conflict("Bảng lương tháng này đã tồn tại.");
             }
+
             if (result.Status == "INVALID_MONTH")
             {
                 return BadRequest("Tháng phải từ 1 đến 12.");
@@ -88,9 +111,12 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(result.Data);
         }
+
         [HttpPut("{id}")]
         [Authorize(Roles = "Quản trị viên,Kế toán")]
-        public async Task<IActionResult> Update(int id, BangLuong bangLuong)
+        public async Task<IActionResult> Update(
+            int id,
+            BangLuong bangLuong)
         {
             if (id != bangLuong.MaLuong)
             {
@@ -105,7 +131,10 @@ namespace QuanLyNhanSu.API.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!await _context.BangLuongs.AnyAsync(x => x.MaLuong == id))
+                var exists = await _context.BangLuongs
+                    .AnyAsync(x => x.MaLuong == id);
+
+                if (!exists)
                 {
                     return NotFound();
                 }

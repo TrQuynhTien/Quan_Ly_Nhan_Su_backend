@@ -1,8 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
 using QuanLyNhanSu.API.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace QuanLyNhanSu.API.Controllers
 {
@@ -21,7 +21,57 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<NhanVien>>> GetAll()
         {
-            return await _context.NhanViens.ToListAsync();
+            if (User.IsInRole("Trưởng phòng"))
+            {
+                var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+                if (maNVClaim == null)
+                {
+                    return Unauthorized();
+                }
+
+                int maNV = int.Parse(maNVClaim);
+
+                var truongPhong = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+                if (truongPhong == null)
+                {
+                    return NotFound("Không tìm thấy thông tin trưởng phòng.");
+                }
+
+                var danhSach = await _context.NhanViens
+                    .Where(x => x.MaPB == truongPhong.MaPB)
+                    .ToListAsync();
+
+                return Ok(danhSach);
+            }
+
+            return Ok(await _context.NhanViens.ToListAsync());
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<NhanVien>> GetMyProfile()
+        {
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int maNV = int.Parse(maNVClaim);
+
+            var nhanVien = await _context.NhanViens
+                .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+            if (nhanVien == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(nhanVien);
         }
 
         [HttpGet("{id}")]
@@ -35,7 +85,32 @@ namespace QuanLyNhanSu.API.Controllers
                 return NotFound();
             }
 
-            return nhanVien;
+            if (User.IsInRole("Trưởng phòng"))
+            {
+                var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+                if (maNVClaim == null)
+                {
+                    return Unauthorized();
+                }
+
+                int maNV = int.Parse(maNVClaim);
+
+                var truongPhong = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+                if (truongPhong == null)
+                {
+                    return NotFound("Không tìm thấy thông tin trưởng phòng.");
+                }
+
+                if (nhanVien.MaPB != truongPhong.MaPB)
+                {
+                    return Forbid();
+                }
+            }
+
+            return Ok(nhanVien);
         }
 
         [HttpPost]
@@ -54,7 +129,9 @@ namespace QuanLyNhanSu.API.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<IActionResult> Update(int id, NhanVien nhanVien)
+        public async Task<IActionResult> Update(
+            int id,
+            NhanVien nhanVien)
         {
             if (id != nhanVien.MaNV)
             {
@@ -90,8 +167,16 @@ namespace QuanLyNhanSu.API.Controllers
             var nhanVien = await _context.NhanViens.FindAsync(id);
 
             if (nhanVien == null)
-            {
                 return NotFound();
+
+            var coTaiKhoan = await _context.TaiKhoans
+                .AnyAsync(x => x.MaNV == id);
+
+            if (coTaiKhoan)
+            {
+                return Conflict(
+                    "Không thể xóa nhân viên vì nhân viên đang có tài khoản."
+                );
             }
 
             _context.NhanViens.Remove(nhanVien);

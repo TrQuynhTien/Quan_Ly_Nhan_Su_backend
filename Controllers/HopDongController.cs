@@ -1,8 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
 using QuanLyNhanSu.API.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace QuanLyNhanSu.API.Controllers
 {
@@ -21,7 +21,37 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<HopDong>>> GetAll()
         {
-            var hopDongs = await _context.HopDongs.ToListAsync();
+            var hopDongs = await _context.HopDongs
+                .OrderByDescending(x => x.NgayBatDau)
+                .ToListAsync();
+
+            foreach (var hopDong in hopDongs)
+            {
+                CapNhatTrangThai(hopDong);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(hopDongs);
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<HopDong>>> GetMyContracts()
+        {
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int maNV = int.Parse(maNVClaim);
+
+            var hopDongs = await _context.HopDongs
+                .Where(x => x.MaNV == maNV)
+                .OrderByDescending(x => x.NgayBatDau)
+                .ToListAsync();
 
             foreach (var hopDong in hopDongs)
             {
@@ -49,22 +79,46 @@ namespace QuanLyNhanSu.API.Controllers
 
             return Ok(hopDong);
         }
-        private void CapNhatTrangThai(HopDong hopDong)
-            {
-                if (hopDong.NgayKetThuc == null || hopDong.NgayKetThuc.Value.Date >= DateTime.Today)
-                {
-                    hopDong.TrangThai = "Còn hiệu lực";
-                }
-                else
-                {
-                    hopDong.TrangThai = "Hết hiệu lực";
-                }
-            }
+
         [HttpPost]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
         public async Task<ActionResult<HopDong>> Create(HopDong hopDong)
         {
+            if (hopDong.NgayKetThuc != null &&
+                hopDong.NgayKetThuc.Value.Date < hopDong.NgayBatDau.Date)
+            {
+                return BadRequest(
+                    "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu."
+                );
+            }
+
+            var nhanVienTonTai = await _context.NhanViens
+                .AnyAsync(x => x.MaNV == hopDong.MaNV);
+
+            if (!nhanVienTonTai)
+            {
+                return BadRequest("Nhân viên không tồn tại.");
+            }
+
+            var trungThoiGian = await _context.HopDongs
+                .AnyAsync(x =>
+                    x.MaNV == hopDong.MaNV &&
+                    (x.NgayKetThuc == null ||
+                     x.NgayKetThuc.Value.Date >= hopDong.NgayBatDau.Date) &&
+                    (hopDong.NgayKetThuc == null ||
+                     x.NgayBatDau.Date <= hopDong.NgayKetThuc.Value.Date)
+                );
+
+            if (trungThoiGian)
+            {
+                return Conflict(
+                    "Nhân viên đang có hợp đồng trùng thời gian. " +
+                    "Hãy kết thúc hợp đồng hiện tại trước khi tạo hợp đồng mới."
+                );
+            }
+
             CapNhatTrangThai(hopDong);
+
             _context.HopDongs.Add(hopDong);
             await _context.SaveChangesAsync();
 
@@ -77,13 +131,50 @@ namespace QuanLyNhanSu.API.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<IActionResult> Update(int id, HopDong hopDong)
+        public async Task<IActionResult> Update(
+            int id,
+            HopDong hopDong)
         {
             if (id != hopDong.MaHD)
             {
                 return BadRequest();
             }
+
+            if (hopDong.NgayKetThuc != null &&
+                hopDong.NgayKetThuc.Value.Date < hopDong.NgayBatDau.Date)
+            {
+                return BadRequest(
+                    "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu."
+                );
+            }
+
+            var tonTai = await _context.HopDongs
+                .AnyAsync(x => x.MaHD == id);
+
+            if (!tonTai)
+            {
+                return NotFound();
+            }
+
+            var trungThoiGian = await _context.HopDongs
+                .AnyAsync(x =>
+                    x.MaHD != id &&
+                    x.MaNV == hopDong.MaNV &&
+                    (x.NgayKetThuc == null ||
+                     x.NgayKetThuc.Value.Date >= hopDong.NgayBatDau.Date) &&
+                    (hopDong.NgayKetThuc == null ||
+                     x.NgayBatDau.Date <= hopDong.NgayKetThuc.Value.Date)
+                );
+
+            if (trungThoiGian)
+            {
+                return Conflict(
+                    "Thời gian hợp đồng bị trùng với hợp đồng khác của nhân viên."
+                );
+            }
+
             CapNhatTrangThai(hopDong);
+
             _context.Entry(hopDong).State = EntityState.Modified;
 
             try
@@ -92,12 +183,7 @@ namespace QuanLyNhanSu.API.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!await _context.HopDongs.AnyAsync(x => x.MaHD == id))
-                {
-                    return NotFound();
-                }
-
-                throw;
+                return NotFound();
             }
 
             return NoContent();
@@ -118,6 +204,19 @@ namespace QuanLyNhanSu.API.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private void CapNhatTrangThai(HopDong hopDong)
+        {
+            if (hopDong.NgayKetThuc == null ||
+                hopDong.NgayKetThuc.Value.Date >= DateTime.Today)
+            {
+                hopDong.TrangThai = "Còn hiệu lực";
+            }
+            else
+            {
+                hopDong.TrangThai = "Hết hiệu lực";
+            }
         }
     }
 }

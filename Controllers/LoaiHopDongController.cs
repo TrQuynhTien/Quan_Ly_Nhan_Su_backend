@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
@@ -16,15 +17,15 @@ namespace QuanLyNhanSu.API.Controllers
             _context = context;
         }
 
-        // GET: api/loai-hop-dongs
         [HttpGet]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<LoaiHopDong>>> GetAll()
         {
             return await _context.LoaiHopDongs.ToListAsync();
         }
 
-        // GET: api/loai-hop-dongs/1
         [HttpGet("{id}")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<LoaiHopDong>> GetById(int id)
         {
             var loaiHopDong = await _context.LoaiHopDongs.FindAsync(id);
@@ -37,9 +38,10 @@ namespace QuanLyNhanSu.API.Controllers
             return loaiHopDong;
         }
 
-        // POST: api/loai-hop-dongs
         [HttpPost]
-        public async Task<ActionResult<LoaiHopDong>> Create(LoaiHopDong loaiHopDong)
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
+        public async Task<ActionResult<LoaiHopDong>> Create(
+            LoaiHopDong loaiHopDong)
         {
             _context.LoaiHopDongs.Add(loaiHopDong);
             await _context.SaveChangesAsync();
@@ -51,9 +53,11 @@ namespace QuanLyNhanSu.API.Controllers
             );
         }
 
-        // PUT: api/loai-hop-dongs/1
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, LoaiHopDong loaiHopDong)
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
+        public async Task<IActionResult> Update(
+            int id,
+            LoaiHopDong loaiHopDong)
         {
             if (id != loaiHopDong.MaLoaiHD)
             {
@@ -82,8 +86,8 @@ namespace QuanLyNhanSu.API.Controllers
             return NoContent();
         }
 
-        // DELETE: api/loai-hop-dongs/1
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
         public async Task<IActionResult> Delete(int id)
         {
             var loaiHopDong = await _context.LoaiHopDongs.FindAsync(id);

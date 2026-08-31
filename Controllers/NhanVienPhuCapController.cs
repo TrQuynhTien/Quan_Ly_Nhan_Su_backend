@@ -18,15 +18,17 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc,Nhân viên")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<NhanVienPhuCap>>> GetAll()
         {
             return await _context.NhanVienPhuCaps.ToListAsync();
         }
 
         [HttpGet("{maNV}/{maPC}")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc,Nhân viên")]
-        public async Task<ActionResult<NhanVienPhuCap>> GetById(int maNV, int maPC)
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
+        public async Task<ActionResult<NhanVienPhuCap>> GetById(
+            int maNV,
+            int maPC)
         {
             var nhanVienPhuCap =
                 await _context.NhanVienPhuCaps.FindAsync(maNV, maPC);
@@ -37,6 +39,25 @@ namespace QuanLyNhanSu.API.Controllers
             }
 
             return nhanVienPhuCap;
+        }
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<NhanVienPhuCap>>> GetMyAllowances()
+        {
+            var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+            if (maNVClaim == null)
+            {
+                return Unauthorized();
+            }
+
+            int maNV = int.Parse(maNVClaim);
+
+            var danhSach = await _context.NhanVienPhuCaps
+                .Where(x => x.MaNV == maNV)
+                .ToListAsync();
+
+            return Ok(danhSach);
         }
 
         [HttpPost]
