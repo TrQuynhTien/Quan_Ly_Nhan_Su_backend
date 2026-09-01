@@ -22,10 +22,10 @@ namespace QuanLyNhanSu.API.Services
         {
             var taiKhoan = await _context.TaiKhoans
                 .FirstOrDefaultAsync(x =>
-                    x.TenDangNhap == tenDangNhap &&
-                    x.MatKhau == matKhau);
+                    x.TenDangNhap == tenDangNhap);
 
-            if (taiKhoan == null)
+            if (taiKhoan == null ||
+                !BCrypt.Net.BCrypt.Verify(matKhau, taiKhoan.MatKhau))
             {
                 return null;
             }

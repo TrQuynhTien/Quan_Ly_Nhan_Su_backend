@@ -62,15 +62,27 @@ namespace QuanLyNhanSu.API.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Quản trị viên")]
-        public async Task<ActionResult<TaiKhoan>> Create(TaiKhoan taiKhoan)
+        public async Task<ActionResult<TaiKhoanResponse>> Create(TaiKhoan taiKhoan)
         {
+            taiKhoan.MatKhau =
+                BCrypt.Net.BCrypt.HashPassword(taiKhoan.MatKhau);
+
             _context.TaiKhoans.Add(taiKhoan);
             await _context.SaveChangesAsync();
+
+            var response = new TaiKhoanResponse
+            {
+                MaTK = taiKhoan.MaTK,
+                TenDangNhap = taiKhoan.TenDangNhap,
+                MaNV = taiKhoan.MaNV,
+                MaQuyen = taiKhoan.MaQuyen,
+                TrangThai = taiKhoan.TrangThai
+            };
 
             return CreatedAtAction(
                 nameof(GetById),
                 new { id = taiKhoan.MaTK },
-                taiKhoan
+                response
             );
         }
 
@@ -83,25 +95,31 @@ namespace QuanLyNhanSu.API.Controllers
                 return BadRequest();
             }
 
+            var taiKhoanCu = await _context.TaiKhoans
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.MaTK == id);
+
+            if (taiKhoanCu == null)
+            {
+                return NotFound();
+            }
+
+            if (!string.IsNullOrWhiteSpace(taiKhoan.MatKhau))
+            {
+                taiKhoan.MatKhau =
+                    BCrypt.Net.BCrypt.HashPassword(taiKhoan.MatKhau);
+            }
+            else
+            {
+                taiKhoan.MatKhau = taiKhoanCu.MatKhau;
+            }
+
             _context.Entry(taiKhoan).State = EntityState.Modified;
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!await _context.TaiKhoans.AnyAsync(x => x.MaTK == id))
-                {
-                    return NotFound();
-                }
-
-                throw;
-            }
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
-
         [HttpDelete("{id}")]
         [Authorize(Roles = "Quản trị viên")]
         public async Task<IActionResult> Delete(int id)
