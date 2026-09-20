@@ -25,6 +25,7 @@ namespace QuanLyNhanSu.API.Data
         public DbSet<KhenThuongKyLuat> KhenThuongKyLuats { get; set; } = null!;
         public DbSet<Quyen> Quyens { get; set; } = null!;
         public DbSet<TaiKhoan> TaiKhoans { get; set; } = null!;
+        public DbSet<ThongBao> ThongBaos { get; set; } = null!;
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

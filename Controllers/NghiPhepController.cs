@@ -24,7 +24,7 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự, Kế toán, Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<NghiPhep>>> GetAll()
         {
             if (User.IsInRole("Trưởng phòng"))
@@ -88,7 +88,7 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc,Nhân viên")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng,Ban giám đốc,Nhân viên")]
         public async Task<ActionResult<NghiPhep>> GetById(int id)
         {
             var nghiPhep = await _context.NghiPheps.FindAsync(id);
@@ -170,6 +170,24 @@ namespace QuanLyNhanSu.API.Controllers
                 NguoiDuyet = null
             };
 
+            if (request.DenNgay < request.TuNgay)
+            {
+                return BadRequest(new
+                {
+                    message = "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu."
+                });
+            }
+
+            var loaiNghiPhepTonTai = await _context.LoaiNghiPheps
+                .AnyAsync(x => x.MaLoaiNP == request.MaLoaiNP);
+
+            if (!loaiNghiPhepTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Loại nghỉ phép không tồn tại."
+                });
+            }
             _context.NghiPheps.Add(nghiPhep);
             await _context.SaveChangesAsync();
 
@@ -285,39 +303,6 @@ namespace QuanLyNhanSu.API.Controllers
             if (result == "ALREADY_PROCESSED")
             {
                 return Conflict("Đơn nghỉ phép đã được xử lý");
-            }
-
-            return NoContent();
-        }
-
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<IActionResult> Update(
-            int id,
-            NghiPhep nghiPhep)
-        {
-            if (id != nghiPhep.MaNP)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(nghiPhep).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                var exists = await _context.NghiPheps
-                    .AnyAsync(x => x.MaNP == id);
-
-                if (!exists)
-                {
-                    return NotFound();
-                }
-
-                throw;
             }
 
             return NoContent();

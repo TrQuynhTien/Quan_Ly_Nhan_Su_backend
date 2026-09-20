@@ -32,6 +32,92 @@ namespace QuanLyNhanSu.API.Services
                 DonNghiPhepChoDuyet = donNghiPhepChoDuyet
             };
         }
+        public async Task<object> GetOverviewByManagerAsync(int maNV)
+        {
+            var homNay = DateTime.Today;
+
+            var truongPhong = await _context.NhanViens
+                .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+            if (truongPhong == null || truongPhong.MaPB == null)
+            {
+                return new
+                {
+                    TongNhanVien = 0,
+                    NhanVienDangLam = 0,
+                    NghiPhepHomNay = 0,
+                    DiMuonHomNay = 0,
+                    DonNghiPhepChoDuyet = 0
+                };
+            }
+
+            int maPB = truongPhong.MaPB.Value;
+
+            var nhanVienTrongPhong = _context.NhanViens
+                .Where(x => x.MaPB == maPB);
+
+            var tongNhanVien = await nhanVienTrongPhong.CountAsync();
+
+            var nhanVienDangLam = await nhanVienTrongPhong
+                .CountAsync(x => x.TrangThai == "Đang làm việc");
+
+            var nghiPhepHomNay = await _context.NghiPheps
+                .Join(
+                    _context.NhanViens,
+                    np => np.MaNV,
+                    nv => nv.MaNV,
+                    (np, nv) => new
+                    {
+                        NghiPhep = np,
+                        NhanVien = nv
+                    }
+                )
+                .CountAsync(x =>
+                    x.NhanVien.MaPB == maPB &&
+                    x.NghiPhep.TrangThai == "Đã duyệt" &&
+                    x.NghiPhep.TuNgay.Date <= homNay &&
+                    x.NghiPhep.DenNgay.Date >= homNay);
+
+            var diMuonHomNay = await _context.ChamCongs
+                .Join(
+                    _context.NhanViens,
+                    cc => cc.MaNV,
+                    nv => nv.MaNV,
+                    (cc, nv) => new
+                    {
+                        ChamCong = cc,
+                        NhanVien = nv
+                    }
+                )
+                .CountAsync(x =>
+                    x.NhanVien.MaPB == maPB &&
+                    x.ChamCong.NgayChamCong.Date == homNay &&
+                    x.ChamCong.TrangThai == "Đi trễ");
+
+            var donNghiPhepChoDuyet = await _context.NghiPheps
+                .Join(
+                    _context.NhanViens,
+                    np => np.MaNV,
+                    nv => nv.MaNV,
+                    (np, nv) => new
+                    {
+                        NghiPhep = np,
+                        NhanVien = nv
+                    }
+                )
+                .CountAsync(x =>
+                    x.NhanVien.MaPB == maPB &&
+                    x.NghiPhep.TrangThai == "Chờ duyệt");
+
+            return new
+            {
+                TongNhanVien = tongNhanVien,
+                NhanVienDangLam = nhanVienDangLam,
+                NghiPhepHomNay = nghiPhepHomNay,
+                DiMuonHomNay = diMuonHomNay,
+                DonNghiPhepChoDuyet = donNghiPhepChoDuyet
+            };
+        }
 
         public async Task<object> GetPayrollByMonthAsync(int thang, int nam)
         {

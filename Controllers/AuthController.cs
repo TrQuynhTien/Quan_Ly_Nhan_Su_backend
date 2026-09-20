@@ -25,9 +25,10 @@ namespace QuanLyNhanSu.API.Controllers
 
             if (token == null)
             {
-                return Unauthorized(
-                    "Tên đăng nhập hoặc mật khẩu không đúng"
-                );
+                return Unauthorized(new
+                {
+                    message = "Tên đăng nhập hoặc mật khẩu không đúng."
+                });
             }
 
             return Ok(new

@@ -64,6 +64,44 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên")]
         public async Task<ActionResult<TaiKhoanResponse>> Create(TaiKhoan taiKhoan)
         {
+            var tenDangNhapDaTonTai = await _context.TaiKhoans
+                .AnyAsync(x => x.TenDangNhap == taiKhoan.TenDangNhap);
+
+            if (tenDangNhapDaTonTai)
+            {
+                return Conflict(new
+                {
+                    message = "Tên đăng nhập đã tồn tại."
+                });
+            }
+            var nhanVienTonTai = await _context.NhanViens
+                .AnyAsync(x => x.MaNV == taiKhoan.MaNV);
+
+            if (!nhanVienTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Nhân viên không tồn tại."
+                });
+            }
+
+            var quyenTonTai = await _context.Quyens
+                .AnyAsync(x => x.MaQuyen == taiKhoan.MaQuyen);
+
+            if (!quyenTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Quyền không tồn tại."
+                });
+            }
+            if (string.IsNullOrWhiteSpace(taiKhoan.MatKhau))
+            {
+                return BadRequest(new
+                {
+                    message = "Mật khẩu không được để trống."
+                });
+            }
             taiKhoan.MatKhau =
                 BCrypt.Net.BCrypt.HashPassword(taiKhoan.MatKhau);
 
@@ -90,35 +128,75 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên")]
         public async Task<IActionResult> Update(int id, TaiKhoan taiKhoan)
         {
-            if (id != taiKhoan.MaTK)
-            {
-                return BadRequest();
-            }
-
+            // 1. Tìm tài khoản cần cập nhật theo id trên URL
             var taiKhoanCu = await _context.TaiKhoans
-                .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.MaTK == id);
 
             if (taiKhoanCu == null)
             {
-                return NotFound();
+                return NotFound(new
+                {
+                    message = "Không tìm thấy tài khoản."
+                });
             }
 
+            // 2. Kiểm tra tên đăng nhập có bị trùng với tài khoản khác không
+            var tenDangNhapDaTonTai = await _context.TaiKhoans
+                .AnyAsync(x =>
+                    x.TenDangNhap == taiKhoan.TenDangNhap &&
+                    x.MaTK != id);
+
+            if (tenDangNhapDaTonTai)
+            {
+                return Conflict(new
+                {
+                    message = "Tên đăng nhập đã tồn tại."
+                });
+            }
+
+            // 3. Kiểm tra nhân viên
+            var nhanVienTonTai = await _context.NhanViens
+                .AnyAsync(x => x.MaNV == taiKhoan.MaNV);
+
+            if (!nhanVienTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Nhân viên không tồn tại."
+                });
+            }
+
+            // 4. Kiểm tra quyền
+            var quyenTonTai = await _context.Quyens
+                .AnyAsync(x => x.MaQuyen == taiKhoan.MaQuyen);
+
+            if (!quyenTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Quyền không tồn tại."
+                });
+            }
+
+            // 5. Cập nhật thông tin
+            taiKhoanCu.TenDangNhap = taiKhoan.TenDangNhap;
+            taiKhoanCu.MaNV = taiKhoan.MaNV;
+            taiKhoanCu.MaQuyen = taiKhoan.MaQuyen;
+            taiKhoanCu.TrangThai = taiKhoan.TrangThai;
+
+            // Chỉ đổi mật khẩu khi FE gửi mật khẩu mới
             if (!string.IsNullOrWhiteSpace(taiKhoan.MatKhau))
             {
-                taiKhoan.MatKhau =
+                taiKhoanCu.MatKhau =
                     BCrypt.Net.BCrypt.HashPassword(taiKhoan.MatKhau);
             }
-            else
-            {
-                taiKhoan.MatKhau = taiKhoanCu.MatKhau;
-            }
-
-            _context.Entry(taiKhoan).State = EntityState.Modified;
 
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new
+            {
+                message = "Cập nhật tài khoản thành công."
+            });
         }
         [HttpDelete("{id}")]
         [Authorize(Roles = "Quản trị viên")]

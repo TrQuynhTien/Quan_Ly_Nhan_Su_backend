@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QuanLyNhanSu.API.Data;
+using QuanLyNhanSu.API.Models;
 
 namespace QuanLyNhanSu.API.Services
 {
@@ -11,7 +12,10 @@ namespace QuanLyNhanSu.API.Services
         {
             _context = context;
         }
-        public async Task<string> ApproveLeaveRequestAsync(int maNP, int nguoiDuyet)
+        
+        public async Task<string> ApproveLeaveRequestAsync(
+            int maNP,
+            int nguoiDuyet)
         {
             var nghiPhep = await _context.NghiPheps
                 .FirstOrDefaultAsync(x => x.MaNP == maNP);
@@ -29,11 +33,25 @@ namespace QuanLyNhanSu.API.Services
             nghiPhep.TrangThai = "Đã duyệt";
             nghiPhep.NguoiDuyet = nguoiDuyet;
 
+            var thongBao = new ThongBao
+            {
+                MaNV = nghiPhep.MaNV,
+                TieuDe = "Đơn nghỉ phép đã được duyệt",
+                NoiDung = "Đơn nghỉ phép của bạn đã được duyệt.",
+                DaDoc = false,
+                NgayTao = DateTime.Now,
+                DuongDan = $"/leave/{nghiPhep.MaNP}"
+            };
+
+            _context.ThongBaos.Add(thongBao);
+
             await _context.SaveChangesAsync();
 
             return "SUCCESS";
         }
-        public async Task<string> RejectLeaveRequestAsync(int maNP, int nguoiDuyet)
+        public async Task<string> RejectLeaveRequestAsync(
+            int maNP,
+            int nguoiDuyet)
         {
             var nghiPhep = await _context.NghiPheps
                 .FirstOrDefaultAsync(x => x.MaNP == maNP);
@@ -50,6 +68,18 @@ namespace QuanLyNhanSu.API.Services
 
             nghiPhep.TrangThai = "Từ chối";
             nghiPhep.NguoiDuyet = nguoiDuyet;
+
+            var thongBao = new ThongBao
+            {
+                MaNV = nghiPhep.MaNV,
+                TieuDe = "Đơn nghỉ phép đã bị từ chối",
+                NoiDung = "Đơn nghỉ phép của bạn đã bị từ chối.",
+                DaDoc = false,
+                NgayTao = DateTime.Now,
+                DuongDan = $"/leave/{nghiPhep.MaNP}"
+            };
+
+            _context.ThongBaos.Add(thongBao);
 
             await _context.SaveChangesAsync();
 

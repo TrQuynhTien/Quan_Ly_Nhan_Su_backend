@@ -13,11 +13,26 @@ builder.Services.AddDbContext<QuanLyNhanSuDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")
     )
 );
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:4200",
+                "https://hrm-enterprise-steel.vercel.app",
+                "https://hrm-enterprise-alxuxbxgy-phats-projects-5afabddf.vercel.app"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<NghiPhepService>();
 builder.Services.AddScoped<BangLuongService>();
 builder.Services.AddScoped<ThongKeService>();
 builder.Services.AddHttpClient<AiService>();
+builder.Services.AddAuthorization();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -56,16 +71,6 @@ builder.Services.AddSwaggerGen(options =>
         [new OpenApiSecuritySchemeReference("bearer", document)] = []
     });
 });
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:4200")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
 
 var app = builder.Build();
 
@@ -74,7 +79,7 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-//app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");
 app.UseAuthentication(); 
 app.UseAuthorization(); 

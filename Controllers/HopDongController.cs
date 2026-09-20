@@ -21,7 +21,36 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<HopDong>>> GetAll()
         {
-            var hopDongs = await _context.HopDongs
+            IQueryable<HopDong> query = _context.HopDongs;
+
+            if (User.IsInRole("Trưởng phòng"))
+            {
+                var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+                if (maNVClaim == null)
+                {
+                    return Unauthorized();
+                }
+
+                int maNV = int.Parse(maNVClaim);
+
+                var truongPhong = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+                if (truongPhong == null)
+                {
+                    return NotFound("Không tìm thấy thông tin trưởng phòng.");
+                }
+
+                query =
+                    from hd in query
+                    join nv in _context.NhanViens
+                        on hd.MaNV equals nv.MaNV
+                    where nv.MaPB == truongPhong.MaPB
+                    select hd;
+            }
+
+            var hopDongs = await query
                 .OrderByDescending(x => x.NgayBatDau)
                 .ToListAsync();
 
@@ -74,6 +103,34 @@ namespace QuanLyNhanSu.API.Controllers
                 return NotFound();
             }
 
+            if (User.IsInRole("Trưởng phòng"))
+            {
+                var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+                if (maNVClaim == null)
+                {
+                    return Unauthorized();
+                }
+
+                int maNV = int.Parse(maNVClaim);
+
+                var truongPhong = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+                var nhanVien = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == hopDong.MaNV);
+
+                if (truongPhong == null || nhanVien == null)
+                {
+                    return NotFound();
+                }
+
+                if (truongPhong.MaPB != nhanVien.MaPB)
+                {
+                    return Forbid();
+                }
+            }
+
             CapNhatTrangThai(hopDong);
             await _context.SaveChangesAsync();
 
@@ -116,6 +173,7 @@ namespace QuanLyNhanSu.API.Controllers
                     "Hãy kết thúc hợp đồng hiện tại trước khi tạo hợp đồng mới."
                 );
             }
+        
 
             CapNhatTrangThai(hopDong);
 
@@ -148,10 +206,10 @@ namespace QuanLyNhanSu.API.Controllers
                 );
             }
 
-            var tonTai = await _context.HopDongs
-                .AnyAsync(x => x.MaHD == id);
+            var hopDongCu = await _context.HopDongs
+                .FirstOrDefaultAsync(x => x.MaHD == id);
 
-            if (!tonTai)
+            if (hopDongCu == null)
             {
                 return NotFound();
             }
@@ -172,10 +230,13 @@ namespace QuanLyNhanSu.API.Controllers
                     "Thời gian hợp đồng bị trùng với hợp đồng khác của nhân viên."
                 );
             }
+            hopDongCu.MaNV = hopDong.MaNV;
+            hopDongCu.MaLoaiHD = hopDong.MaLoaiHD;
+            hopDongCu.NgayBatDau = hopDong.NgayBatDau;
+            hopDongCu.NgayKetThuc = hopDong.NgayKetThuc;
+            hopDongCu.LuongCoBan = hopDong.LuongCoBan;
 
-            CapNhatTrangThai(hopDong);
-
-            _context.Entry(hopDong).State = EntityState.Modified;
+            CapNhatTrangThai(hopDongCu);
 
             try
             {

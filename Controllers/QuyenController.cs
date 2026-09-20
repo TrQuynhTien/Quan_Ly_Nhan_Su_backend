@@ -21,80 +21,29 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên")]
         public async Task<ActionResult<IEnumerable<Quyen>>> GetAll()
         {
-            return await _context.Quyens.ToListAsync();
+            var danhSach = await _context.Quyens
+                .OrderBy(x => x.MaQuyen)
+                .ToListAsync();
+
+            return Ok(danhSach);
         }
 
         [HttpGet("{id}")]
         [Authorize(Roles = "Quản trị viên")]
         public async Task<ActionResult<Quyen>> GetById(int id)
         {
-            var quyen = await _context.Quyens.FindAsync(id);
+            var quyen = await _context.Quyens
+                .FirstOrDefaultAsync(x => x.MaQuyen == id);
 
             if (quyen == null)
             {
-                return NotFound();
-            }
-
-            return quyen;
-        }
-
-        [HttpPost]
-        [Authorize(Roles = "Quản trị viên")]
-        public async Task<ActionResult<Quyen>> Create(Quyen quyen)
-        {
-            _context.Quyens.Add(quyen);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = quyen.MaQuyen },
-                quyen
-            );
-        }
-
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Quản trị viên")]
-        public async Task<IActionResult> Update(int id, Quyen quyen)
-        {
-            if (id != quyen.MaQuyen)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(quyen).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!await _context.Quyens.AnyAsync(x => x.MaQuyen == id))
+                return NotFound(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Không tìm thấy quyền."
+                });
             }
 
-            return NoContent();
-        }
-
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Quản trị viên")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            var quyen = await _context.Quyens.FindAsync(id);
-
-            if (quyen == null)
-            {
-                return NotFound();
-            }
-
-            _context.Quyens.Remove(quyen);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            return Ok(quyen);
         }
     }
 }

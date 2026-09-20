@@ -128,6 +128,38 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán")]
         public async Task<ActionResult<ChamCong>> Create(ChamCong chamCong)
         {
+            var nhanVienTonTai = await _context.NhanViens
+                .AnyAsync(x => x.MaNV == chamCong.MaNV);
+
+            if (!nhanVienTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Nhân viên không tồn tại."
+                });
+            }
+
+            var daChamCong = await _context.ChamCongs
+                .AnyAsync(x =>
+                    x.MaNV == chamCong.MaNV &&
+                    x.MaCa == chamCong.MaCa &&
+                    x.NgayChamCong.Date == chamCong.NgayChamCong.Date);
+
+            if (daChamCong)
+            {
+                return Conflict(new
+                {
+                    message = "Nhân viên đã có chấm công cho ca này trong ngày."
+                });
+            }
+
+            if (chamCong.SoGioLam < 0)
+            {
+                return BadRequest(new
+                {
+                    message = "Số giờ làm không hợp lệ."
+                });
+            }
             _context.ChamCongs.Add(chamCong);
             await _context.SaveChangesAsync();
 
@@ -149,26 +181,50 @@ namespace QuanLyNhanSu.API.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(chamCong).State = EntityState.Modified;
+            var chamCongCu = await _context.ChamCongs
+                .FirstOrDefaultAsync(x => x.MaCC == id);
 
-            try
+            if (chamCongCu == null)
             {
-                await _context.SaveChangesAsync();
+                return NotFound();
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                var exists = await _context.ChamCongs
-                    .AnyAsync(x => x.MaCC == id);
 
-                if (!exists)
+            var biTrung = await _context.ChamCongs
+                .AnyAsync(x =>
+                    x.MaCC != id &&
+                    x.MaNV == chamCong.MaNV &&
+                    x.MaCa == chamCong.MaCa &&
+                    x.NgayChamCong.Date == chamCong.NgayChamCong.Date);
+
+            if (biTrung)
+            {
+                return Conflict(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Nhân viên đã có chấm công cho ca này trong ngày."
+                });
             }
+
+            if (chamCong.SoGioLam == null || chamCong.SoGioLam < 0)
+            {
+                return BadRequest(new
+                {
+                    message = "Số giờ làm không hợp lệ."
+                });
+            }
+
+            chamCongCu.MaNV = chamCong.MaNV;
+            chamCongCu.MaCa = chamCong.MaCa;
+            chamCongCu.NgayChamCong = chamCong.NgayChamCong;
+            chamCongCu.GioVao = chamCong.GioVao;
+            chamCongCu.GioRa = chamCong.GioRa;
+            chamCongCu.SoGioLam = chamCong.SoGioLam;
+            chamCongCu.TrangThai = chamCong.TrangThai;
+            chamCongCu.GhiChu = chamCong.GhiChu;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
+
         }
 
         [HttpDelete("{id}")]

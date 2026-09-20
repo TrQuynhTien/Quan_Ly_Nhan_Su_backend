@@ -61,27 +61,24 @@ namespace QuanLyNhanSu.API.Controllers
         {
             if (id != loaiHopDong.MaLoaiHD)
             {
-                return BadRequest();
-            }
-
-            _context.Entry(loaiHopDong).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                var exists = await _context.LoaiHopDongs
-                    .AnyAsync(x => x.MaLoaiHD == id);
-
-                if (!exists)
+                return BadRequest(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Mã loại hợp đồng không hợp lệ."
+                });
             }
+
+            var loaiHopDongCu = await _context.LoaiHopDongs
+                .FirstOrDefaultAsync(x => x.MaLoaiHD == id);
+
+            if (loaiHopDongCu == null)
+            {
+                return NotFound();
+            }
+
+            loaiHopDongCu.TenLoaiHD = loaiHopDong.TenLoaiHD;
+            loaiHopDongCu.MoTa = loaiHopDong.MoTa;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -90,11 +87,23 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
         public async Task<IActionResult> Delete(int id)
         {
-            var loaiHopDong = await _context.LoaiHopDongs.FindAsync(id);
+            var loaiHopDong = await _context.LoaiHopDongs
+                .FindAsync(id);
 
             if (loaiHopDong == null)
             {
                 return NotFound();
+            }
+
+            var dangDuocSuDung = await _context.HopDongs
+                .AnyAsync(x => x.MaLoaiHD == id);
+
+            if (dangDuocSuDung)
+            {
+                return Conflict(new
+                {
+                    message = "Không thể xóa loại hợp đồng vì đang có hợp đồng sử dụng loại này."
+                });
             }
 
             _context.LoaiHopDongs.Remove(loaiHopDong);

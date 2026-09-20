@@ -54,35 +54,33 @@ namespace QuanLyNhanSu.API.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<IActionResult> UpdateChucVu(int id, ChucVu chucVu)
+        public async Task<IActionResult> UpdateChucVu(
+            int id,
+            ChucVu chucVu)
         {
             if (id != chucVu.MaCV)
             {
-                return BadRequest();
-            }
-
-            _context.Entry(chucVu).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                bool tonTai = await _context.ChucVus
-                    .AnyAsync(cv => cv.MaCV == id);
-
-                if (!tonTai)
+                return BadRequest(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Mã chức vụ không hợp lệ."
+                });
             }
+
+            var chucVuCu = await _context.ChucVus
+                .FirstOrDefaultAsync(x => x.MaCV == id);
+
+            if (chucVuCu == null)
+            {
+                return NotFound();
+            }
+
+            chucVuCu.TenCV = chucVu.TenCV;
+            chucVuCu.MoTa = chucVu.MoTa;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
-
         [HttpDelete("{id}")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
         public async Task<IActionResult> DeleteChucVu(int id)
@@ -94,19 +92,21 @@ namespace QuanLyNhanSu.API.Controllers
                 return NotFound();
             }
 
-            try
-            {
-                _context.ChucVus.Remove(chucVu);
-                await _context.SaveChangesAsync();
+            var dangDuocSuDung = await _context.NhanViens
+                .AnyAsync(x => x.MaCV == id);
 
-                return NoContent();
-            }
-            catch (DbUpdateException)
+            if (dangDuocSuDung)
             {
-                return BadRequest(
-                    "Không thể xóa chức vụ vì đang có nhân viên sử dụng chức vụ này."
-                );
+                return Conflict(new
+                {
+                    message = "Không thể xóa chức vụ vì đang có nhân viên sử dụng chức vụ này."
+                });
             }
+
+            _context.ChucVus.Remove(chucVu);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
     }
 }

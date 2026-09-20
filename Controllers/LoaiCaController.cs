@@ -18,7 +18,7 @@ namespace QuanLyNhanSu.API.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
+        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc, Nhân viên")]
         public async Task<ActionResult<IEnumerable<LoaiCa>>> GetAll()
         {
             return await _context.LoaiCas.ToListAsync();

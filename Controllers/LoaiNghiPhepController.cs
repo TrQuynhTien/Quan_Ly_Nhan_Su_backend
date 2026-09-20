@@ -54,30 +54,37 @@ namespace QuanLyNhanSu.API.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự")]
-        public async Task<IActionResult> Update(int id, LoaiNghiPhep loaiNghiPhep)
+        public async Task<IActionResult> Update(
+            int id,
+            LoaiNghiPhep loaiNghiPhep)
         {
             if (id != loaiNghiPhep.MaLoaiNP)
             {
-                return BadRequest();
-            }
-
-            _context.Entry(loaiNghiPhep).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!await _context.LoaiNghiPheps.AnyAsync(x => x.MaLoaiNP == id))
+                return BadRequest(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Mã loại nghỉ phép không hợp lệ."
+                });
             }
 
-            return NoContent();
+            var loaiCu = await _context.LoaiNghiPheps
+                .FirstOrDefaultAsync(x => x.MaLoaiNP == id);
+
+            if (loaiCu == null)
+            {
+                return NotFound(new
+                {
+                    message = "Không tìm thấy loại nghỉ phép."
+                });
+            }
+
+            loaiCu.TenLoaiNP = loaiNghiPhep.TenLoaiNP;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Cập nhật loại nghỉ phép thành công."
+            });
         }
 
         [HttpDelete("{id}")]

@@ -22,13 +22,21 @@ namespace QuanLyNhanSu.API.Controllers
             _bangLuongService = bangLuongService;
         }
 
+        // Xem toàn bộ bảng lương
         [HttpGet]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Ban giám đốc")]
+        [Authorize(Roles =
+            "Quản trị viên,Nhân viên nhân sự,Kế toán,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<BangLuong>>> GetAll()
         {
-            return await _context.BangLuongs.ToListAsync();
+            var danhSach = await _context.BangLuongs
+                .OrderByDescending(x => x.Nam)
+                .ThenByDescending(x => x.Thang)
+                .ToListAsync();
+
+            return Ok(danhSach);
         }
 
+        // Người dùng xem bảng lương của chính mình
         [HttpGet("me")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<BangLuong>>> GetMyPayroll()
@@ -51,109 +59,93 @@ namespace QuanLyNhanSu.API.Controllers
             return Ok(bangLuongs);
         }
 
+        // Xem chi tiết một bảng lương
         [HttpGet("{id}")]
-        [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Ban giám đốc")]
+        [Authorize(Roles =
+            "Quản trị viên,Nhân viên nhân sự,Kế toán,Ban giám đốc")]
         public async Task<ActionResult<BangLuong>> GetById(int id)
         {
-            var bangLuong = await _context.BangLuongs.FindAsync(id);
+            var bangLuong = await _context.BangLuongs
+                .FirstOrDefaultAsync(x => x.MaLuong == id);
 
             if (bangLuong == null)
             {
-                return NotFound();
+                return NotFound(new
+                {
+                    message = "Không tìm thấy bảng lương."
+                });
             }
 
-            return bangLuong;
+            return Ok(bangLuong);
         }
 
-        [HttpPost]
-        [Authorize(Roles = "Quản trị viên,Kế toán")]
-        public async Task<ActionResult<BangLuong>> Create(BangLuong bangLuong)
-        {
-            _context.BangLuongs.Add(bangLuong);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = bangLuong.MaLuong },
-                bangLuong
-            );
-        }
-
+        // Tính tự động / tính lại bảng lương
         [HttpPost("tinh-luong")]
         [Authorize(Roles = "Quản trị viên,Kế toán")]
-        public async Task<ActionResult<BangLuong>> TinhLuong(
+        public async Task<ActionResult> TinhLuong(
             int maNV,
             int thang,
             int nam)
         {
+            var nhanVienTonTai = await _context.NhanViens
+                .AnyAsync(x => x.MaNV == maNV);
+
+            if (!nhanVienTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Nhân viên không tồn tại."
+                });
+            }
+
             var result = await _bangLuongService
                 .CalculatePayrollAsync(maNV, thang, nam);
 
             if (result.Status == "NO_CONTRACT")
             {
-                return BadRequest("Nhân viên không có hợp đồng phù hợp.");
-            }
-
-            if (result.Status == "ALREADY_EXISTS")
-            {
-                return Conflict("Bảng lương tháng này đã tồn tại.");
+                return BadRequest(new
+                {
+                    message = "Nhân viên không có hợp đồng phù hợp."
+                });
             }
 
             if (result.Status == "INVALID_MONTH")
             {
-                return BadRequest("Tháng phải từ 1 đến 12.");
+                return BadRequest(new
+                {
+                    message = "Tháng phải từ 1 đến 12."
+                });
             }
 
             if (result.Status == "INVALID_YEAR")
             {
-                return BadRequest("Năm không hợp lệ.");
-            }
-
-            return Ok(result.Data);
-        }
-
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Quản trị viên,Kế toán")]
-        public async Task<IActionResult> Update(
-            int id,
-            BangLuong bangLuong)
-        {
-            if (id != bangLuong.MaLuong)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(bangLuong).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                var exists = await _context.BangLuongs
-                    .AnyAsync(x => x.MaLuong == id);
-
-                if (!exists)
+                return BadRequest(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Năm không hợp lệ."
+                });
             }
 
-            return NoContent();
+            return Ok(new
+            {
+                message = "Tính lương thành công.",
+                data = result.Data
+            });
         }
 
+        // Xóa bảng lương khi dữ liệu được tạo sai
         [HttpDelete("{id}")]
         [Authorize(Roles = "Quản trị viên,Kế toán")]
         public async Task<IActionResult> Delete(int id)
         {
-            var bangLuong = await _context.BangLuongs.FindAsync(id);
+            var bangLuong = await _context.BangLuongs
+                .FirstOrDefaultAsync(x => x.MaLuong == id);
 
             if (bangLuong == null)
             {
-                return NotFound();
+                return NotFound(new
+                {
+                    message = "Không tìm thấy bảng lương."
+                });
             }
 
             _context.BangLuongs.Remove(bangLuong);

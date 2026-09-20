@@ -47,5 +47,16 @@ namespace QuanLyNhanSu.API.Models
 
         [StringLength(50)]
         public string TrangThai { get; set; } = "Đang làm việc";
+
+        // Navigation Properties
+
+        //[ForeignKey(nameof(MaPB))]
+        //public PhongBan? PhongBan { get; set; }
+
+        //[ForeignKey(nameof(MaCV))]
+        //public ChucVu? ChucVu { get; set; }
+
+        //[ForeignKey(nameof(MaTD))]
+        //public TrinhDo? TrinhDo { get; set; }
     }
 }

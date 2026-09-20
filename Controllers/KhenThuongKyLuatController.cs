@@ -21,7 +21,46 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán,Trưởng phòng,Ban giám đốc")]
         public async Task<ActionResult<IEnumerable<KhenThuongKyLuat>>> GetAll()
         {
-            return await _context.KhenThuongKyLuats.ToListAsync();
+            if (User.IsInRole("Trưởng phòng"))
+            {
+                var maNVClaim = User.FindFirst("MaNV")?.Value;
+
+                if (maNVClaim == null)
+                {
+                    return Unauthorized();
+                }
+
+                int maNV = int.Parse(maNVClaim);
+
+                var truongPhong = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+                if (truongPhong == null)
+                {
+                    return NotFound("Không tìm thấy thông tin trưởng phòng.");
+                }
+
+                var danhSach = await _context.KhenThuongKyLuats
+                    .Join(
+                        _context.NhanViens,
+                        ktkl => ktkl.MaNV,
+                        nv => nv.MaNV,
+                        (ktkl, nv) => new
+                        {
+                            KTKL = ktkl,
+                            MaPB = nv.MaPB
+                        }
+                    )
+                    .Where(x => x.MaPB == truongPhong.MaPB)
+                    .Select(x => x.KTKL)
+                    .ToListAsync();
+
+                return Ok(danhSach);
+            }
+
+            return Ok(await _context.KhenThuongKyLuats
+                .OrderByDescending(x => x.NgayQuyetDinh)
+                .ToListAsync());
         }
 
         [HttpGet("{id}")]
@@ -35,7 +74,33 @@ namespace QuanLyNhanSu.API.Controllers
             {
                 return NotFound();
             }
+            if (User.IsInRole("Trưởng phòng"))
+            {
+                var maNVClaim = User.FindFirst("MaNV")?.Value;
 
+                if (maNVClaim == null)
+                {
+                    return Unauthorized();
+                }
+
+                int maNV = int.Parse(maNVClaim);
+
+                var truongPhong = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+                var nhanVien = await _context.NhanViens
+                    .FirstOrDefaultAsync(x => x.MaNV == khenThuongKyLuat.MaNV);
+
+                if (truongPhong == null || nhanVien == null)
+                {
+                    return NotFound();
+                }
+
+                if (truongPhong.MaPB != nhanVien.MaPB)
+                {
+                    return Forbid();
+                }
+            }
             return khenThuongKyLuat;
         }
 
@@ -65,6 +130,34 @@ namespace QuanLyNhanSu.API.Controllers
         public async Task<ActionResult<KhenThuongKyLuat>> Create(
             KhenThuongKyLuat khenThuongKyLuat)
         {
+            var nhanVienTonTai = await _context.NhanViens
+                .AnyAsync(x => x.MaNV == khenThuongKyLuat.MaNV);
+
+            if (!nhanVienTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Nhân viên không tồn tại."
+                });
+            }
+
+            if (khenThuongKyLuat.Loai != "Khen thưởng" &&
+                khenThuongKyLuat.Loai != "Kỷ luật")
+            {
+                return BadRequest(new
+                {
+                    message = "Loại phải là 'Khen thưởng' hoặc 'Kỷ luật'."
+                });
+            }
+
+            if (khenThuongKyLuat.SoTien < 0)
+            {
+                return BadRequest(new
+                {
+                    message = "Số tiền không được âm."
+                });
+            }
+
             _context.KhenThuongKyLuats.Add(khenThuongKyLuat);
             await _context.SaveChangesAsync();
 
@@ -83,26 +176,54 @@ namespace QuanLyNhanSu.API.Controllers
         {
             if (id != khenThuongKyLuat.MaKTKL)
             {
-                return BadRequest();
-            }
-
-            _context.Entry(khenThuongKyLuat).State =
-                EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!await _context.KhenThuongKyLuats
-                    .AnyAsync(x => x.MaKTKL == id))
+                return BadRequest(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Mã khen thưởng/kỷ luật không hợp lệ."
+                });
             }
+
+            var banGhiCu = await _context.KhenThuongKyLuats
+                .FirstOrDefaultAsync(x => x.MaKTKL == id);
+
+            if (banGhiCu == null)
+            {
+                return NotFound();
+            }
+
+            var nhanVienTonTai = await _context.NhanViens
+                .AnyAsync(x => x.MaNV == khenThuongKyLuat.MaNV);
+
+            if (!nhanVienTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Nhân viên không tồn tại."
+                });
+            }
+
+            if (khenThuongKyLuat.Loai != "Khen thưởng" &&
+                khenThuongKyLuat.Loai != "Kỷ luật")
+            {
+                return BadRequest(new
+                {
+                    message = "Loại phải là 'Khen thưởng' hoặc 'Kỷ luật'."
+                });
+            }
+
+            if (khenThuongKyLuat.SoTien < 0)
+            {
+                return BadRequest(new
+                {
+                    message = "Số tiền không được âm."
+                });
+            }
+
+            banGhiCu.MaNV = khenThuongKyLuat.MaNV;
+            banGhiCu.Loai = khenThuongKyLuat.Loai;
+            banGhiCu.NgayQuyetDinh = khenThuongKyLuat.NgayQuyetDinh;
+            banGhiCu.SoTien = khenThuongKyLuat.SoTien;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }

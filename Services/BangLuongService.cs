@@ -45,12 +45,14 @@ namespace QuanLyNhanSu.API.Services
                 return ("NO_CONTRACT", null);
             }
 
-            var soNgayCong = await _context.ChamCongs
+            var tongGioCong = await _context.ChamCongs
                 .Where(x =>
                     x.MaNV == maNV &&
                     x.NgayChamCong >= ngayDauThang &&
                     x.NgayChamCong <= ngayCuoiThang)
-                .CountAsync();
+                .SumAsync(x => x.SoGioLam ?? 0);
+
+            var soNgayCong = tongGioCong / 8m;
 
             var tongPhuCap = await _context.NhanVienPhuCaps
                 .Where(x =>
@@ -98,7 +100,16 @@ namespace QuanLyNhanSu.API.Services
 
             if (bangLuongDaTonTai != null)
             {
-                return ("ALREADY_EXISTS", null);
+                bangLuongDaTonTai.LuongCoBan = hopDong.LuongCoBan;
+                bangLuongDaTonTai.TongPhuCap = tongPhuCap;
+                bangLuongDaTonTai.TongThuong = tongThuong;
+                bangLuongDaTonTai.TongKhauTru = tongKhauTru;
+                bangLuongDaTonTai.SoNgayCong = soNgayCong;
+                bangLuongDaTonTai.TongLuong = tongLuong;
+
+                await _context.SaveChangesAsync();
+
+                return ("SUCCESS", bangLuongDaTonTai);
             }
 
             var bangLuong = new BangLuong

@@ -56,26 +56,23 @@ namespace QuanLyNhanSu.API.Controllers
         {
             if (id != trinhDo.MaTD)
             {
-                return BadRequest();
-            }
-
-            _context.Entry(trinhDo).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                var exists = await _context.TrinhDos.AnyAsync(x => x.MaTD == id);
-
-                if (!exists)
+                return BadRequest(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Mã trình độ không hợp lệ."
+                });
             }
+
+            var trinhDoCu = await _context.TrinhDos
+                .FirstOrDefaultAsync(x => x.MaTD == id);
+
+            if (trinhDoCu == null)
+            {
+                return NotFound();
+            }
+
+            trinhDoCu.TenTD = trinhDo.TenTD;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -89,6 +86,17 @@ namespace QuanLyNhanSu.API.Controllers
             if (trinhDo == null)
             {
                 return NotFound();
+            }
+
+            var dangDuocSuDung = await _context.NhanViens
+                .AnyAsync(x => x.MaTD == id);
+
+            if (dangDuocSuDung)
+            {
+                return Conflict(new
+                {
+                    message = "Không thể xóa trình độ vì đang có nhân viên sử dụng trình độ này."
+                });
             }
 
             _context.TrinhDos.Remove(trinhDo);

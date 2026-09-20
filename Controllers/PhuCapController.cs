@@ -42,6 +42,13 @@ namespace QuanLyNhanSu.API.Controllers
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Kế toán")]
         public async Task<ActionResult<PhuCap>> Create(PhuCap phuCap)
         {
+            if (phuCap.SoTien < 0)
+            {
+                return BadRequest(new
+                {
+                    message = "Số tiền phụ cấp không được âm."
+                });
+            } 
             _context.PhuCaps.Add(phuCap);
             await _context.SaveChangesAsync();
 
@@ -58,24 +65,32 @@ namespace QuanLyNhanSu.API.Controllers
         {
             if (id != phuCap.MaPC)
             {
-                return BadRequest();
-            }
-
-            _context.Entry(phuCap).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!await _context.PhuCaps.AnyAsync(x => x.MaPC == id))
+                return BadRequest(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Mã phụ cấp không hợp lệ."
+                });
             }
+
+            var phuCapCu = await _context.PhuCaps
+                .FirstOrDefaultAsync(x => x.MaPC == id);
+
+            if (phuCapCu == null)
+            {
+                return NotFound();
+            }
+
+            if (phuCap.SoTien < 0)
+            {
+                return BadRequest(new
+                {
+                    message = "Số tiền phụ cấp không được âm."
+                });
+            }
+
+            phuCapCu.TenPC = phuCap.TenPC;
+            phuCapCu.SoTien = phuCap.SoTien;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -90,7 +105,16 @@ namespace QuanLyNhanSu.API.Controllers
             {
                 return NotFound();
             }
+            var dangDuocSuDung = await _context.NhanVienPhuCaps
+                .AnyAsync(x => x.MaPC == id);
 
+            if (dangDuocSuDung)
+            {
+                return Conflict(new
+                {
+                    message = "Không thể xóa phụ cấp vì đang được gán cho nhân viên."
+                });
+            }
             _context.PhuCaps.Remove(phuCap);
             await _context.SaveChangesAsync();
 

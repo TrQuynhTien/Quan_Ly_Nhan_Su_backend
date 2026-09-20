@@ -25,6 +25,7 @@ namespace QuanLyNhanSu.API.Services
                     x.TenDangNhap == tenDangNhap);
 
             if (taiKhoan == null ||
+                taiKhoan.TrangThai != "Hoạt động" ||
                 !BCrypt.Net.BCrypt.Verify(matKhau, taiKhoan.MatKhau))
             {
                 return null;

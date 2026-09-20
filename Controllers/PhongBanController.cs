@@ -60,27 +60,25 @@ namespace QuanLyNhanSu.API.Controllers
         {
             if (id != phongBan.MaPB)
             {
-                return BadRequest();
-            }
-
-            _context.Entry(phongBan).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                bool tonTai = await _context.PhongBans
-                    .AnyAsync(pb => pb.MaPB == id);
-
-                if (!tonTai)
+                return BadRequest(new
                 {
-                    return NotFound();
-                }
-
-                throw;
+                    message = "Mã phòng ban không hợp lệ."
+                });
             }
+
+            var phongBanCu = await _context.PhongBans
+                .FirstOrDefaultAsync(x => x.MaPB == id);
+
+            if (phongBanCu == null)
+            {
+                return NotFound();
+            }
+
+            phongBanCu.TenPB = phongBan.TenPB;
+            phongBanCu.MoTa = phongBan.MoTa;
+            phongBanCu.TrangThai = phongBan.TrangThai;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -94,6 +92,17 @@ namespace QuanLyNhanSu.API.Controllers
             if (phongBan == null)
             {
                 return NotFound();
+            }
+
+            var dangCoNhanVien = await _context.NhanViens
+                .AnyAsync(x => x.MaPB == id);
+
+            if (dangCoNhanVien)
+            {
+                return Conflict(new
+                {
+                    message = "Không thể xóa phòng ban vì vẫn còn nhân viên thuộc phòng ban này."
+                });
             }
 
             _context.PhongBans.Remove(phongBan);
