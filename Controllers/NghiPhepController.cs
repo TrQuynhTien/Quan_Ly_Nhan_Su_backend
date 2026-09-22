@@ -159,6 +159,40 @@ namespace QuanLyNhanSu.API.Controllers
 
             int maNV = int.Parse(maNVClaim);
 
+            // Kiểm tra ngày nghỉ
+            if (request.DenNgay < request.TuNgay)
+            {
+                return BadRequest(new
+                {
+                    message = "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu."
+                });
+            }
+
+            // Kiểm tra loại nghỉ phép
+            var loaiNghiPhepTonTai = await _context.LoaiNghiPheps
+                .AnyAsync(x => x.MaLoaiNP == request.MaLoaiNP);
+
+            if (!loaiNghiPhepTonTai)
+            {
+                return BadRequest(new
+                {
+                    message = "Loại nghỉ phép không tồn tại."
+                });
+            }
+
+            // Lấy thông tin nhân viên gửi đơn
+            var nhanVien = await _context.NhanViens
+                .FirstOrDefaultAsync(x => x.MaNV == maNV);
+
+            if (nhanVien == null)
+            {
+                return NotFound(new
+                {
+                    message = "Không tìm thấy thông tin nhân viên."
+                });
+            }
+
+            // Tạo đơn nghỉ phép
             var nghiPhep = new NghiPhep
             {
                 MaNV = maNV,
@@ -170,34 +204,44 @@ namespace QuanLyNhanSu.API.Controllers
                 NguoiDuyet = null
             };
 
-            if (request.DenNgay < request.TuNgay)
-            {
-                return BadRequest(new
-                {
-                    message = "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu."
-                });
-            }
+        _context.NghiPheps.Add(nghiPhep);
+        await _context.SaveChangesAsync();
 
-            var loaiNghiPhepTonTai = await _context.LoaiNghiPheps
-                .AnyAsync(x => x.MaLoaiNP == request.MaLoaiNP);
+        // Tìm trưởng phòng cùng phòng ban với nhân viên
+        var truongPhong = await (
+            from tk in _context.TaiKhoans
+            join q in _context.Quyens
+                on tk.MaQuyen equals q.MaQuyen
+            join nv in _context.NhanViens
+                on tk.MaNV equals nv.MaNV
+            where q.TenQuyen == "Trưởng phòng"
+                && nv.MaPB == nhanVien.MaPB
+                && tk.TrangThai == "Hoạt động"
+            select nv
+        ).FirstOrDefaultAsync();
 
-            if (!loaiNghiPhepTonTai)
+        if (truongPhong != null)
+        {
+            var thongBao = new ThongBao
             {
-                return BadRequest(new
-                {
-                    message = "Loại nghỉ phép không tồn tại."
-                });
-            }
-            _context.NghiPheps.Add(nghiPhep);
+                MaNV = truongPhong.MaNV,
+                TieuDe = "Có đơn nghỉ phép mới",
+                NoiDung = $"{nhanVien.HoTen} vừa gửi một đơn nghỉ phép cần duyệt.",
+                DaDoc = false,
+                NgayTao = DateTime.Now,
+                DuongDan = $"/leave/{nghiPhep.MaNP}"
+            };
+
+            _context.ThongBaos.Add(thongBao);
             await _context.SaveChangesAsync();
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = nghiPhep.MaNP },
-                nghiPhep
-            );
         }
 
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = nghiPhep.MaNP },
+            nghiPhep
+        );  
+        }
         [HttpPut("{id}/approve")]
         [Authorize(Roles = "Quản trị viên,Nhân viên nhân sự,Trưởng phòng")]
         public async Task<IActionResult> Approve(int id)

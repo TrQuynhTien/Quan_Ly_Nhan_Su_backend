@@ -25,7 +25,7 @@ namespace QuanLyNhanSu.API.Services
                 return "Vui lòng nhập câu hỏi.";
             }
 
-            // 2. Lấy Gemini API Key
+            // 2. Lấy Gemini API Key từ biến môi trường được lưu trong Environment trên hosting
             var apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
 
             if (string.IsNullOrWhiteSpace(apiKey))
