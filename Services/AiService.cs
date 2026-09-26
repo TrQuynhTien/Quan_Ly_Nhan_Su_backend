@@ -25,7 +25,7 @@ namespace QuanLyNhanSu.API.Services
                 return "Vui lòng nhập câu hỏi.";
             }
 
-            // 2. Lấy Gemini API Key từ biến môi trường được lưu trong Environment trên hosting
+            // 2. Lấy Gemini API Key từ Environment
             var apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
 
             if (string.IsNullOrWhiteSpace(apiKey))
@@ -33,7 +33,8 @@ namespace QuanLyNhanSu.API.Services
                 return "Chưa cấu hình GEMINI_API_KEY.";
             }
 
-            // 3. Xác định tháng / năm nếu người dùng có nhập
+            // 3. Backend xác định tháng / năm.
+            // Giữ Regex hiện tại để tránh phụ thuộc hoàn toàn vào AI.
             var thang = DateTime.Today.Month;
             var nam = DateTime.Today.Year;
 
@@ -63,88 +64,232 @@ namespace QuanLyNhanSu.API.Services
                 return "Năm không hợp lệ.";
             }
 
-            // 4. Backend lấy gói dữ liệu nhân sự
-            // Không cần Gemini phân loại intent nữa
+            // =========================================================
+            // GEMINI REQUEST #1: PHÂN TÍCH Ý ĐỊNH
+            // =========================================================
 
-            var overview = await _thongKeService
-                .GetOverviewAsync();
+            var intentPrompt = $"""
+            Bạn có nhiệm vụ phân tích ý định câu hỏi trong hệ thống quản lý nhân sự.
 
-            var chamCong = await _thongKeService
-                .GetAttendanceByMonthAsync(thang, nam);
+            Hãy xác định câu hỏi thuộc MỘT trong các nhóm sau:
 
-            var nghiPhep = await _thongKeService
-                .GetLeaveByMonthAsync(thang, nam);
+            OVERVIEW    : tổng quan nhân sự, số lượng nhân viên, thông tin tổng hợp
+            ATTENDANCE  : chấm công, ngày công, giờ làm
+            LEAVE       : nghỉ phép
+            PAYROLL     : lương, bảng lương, quỹ lương
+            CONTRACT    : hợp đồng, hợp đồng sắp hết hạn
+            DEPARTMENT  : phòng ban, nhân viên theo phòng ban
+            POSITION    : chức vụ, nhân viên theo chức vụ
+            STATUS      : trạng thái làm việc của nhân viên
+            UNKNOWN     : không thuộc phạm vi dữ liệu trên
 
-            var quyLuong = await _thongKeService
-                .GetPayrollByMonthAsync(thang, nam);
+            Chỉ trả về đúng MỘT từ trong danh sách:
+            OVERVIEW
+            ATTENDANCE
+            LEAVE
+            PAYROLL
+            CONTRACT
+            DEPARTMENT
+            POSITION
+            STATUS
+            UNKNOWN
 
-            var hopDong = await _thongKeService
-                .GetExpiringContractsAsync();
+            Không giải thích.
+            Không trả JSON.
+            Không thêm ký tự khác.
 
-            var phongBan = await _thongKeService
-                .GetEmployeesByDepartmentAsync();
+            Câu hỏi:
+            {question}
+            """;
 
-            var chucVu = await _thongKeService
-                .GetEmployeesByPositionAsync();
+            var intentResult = await SendToGeminiAsync(
+                intentPrompt,
+                apiKey
+            );
 
-            var trangThai = await _thongKeService
-                .GetEmployeesByStatusAsync();
-
-            var duLieu = new
+            // Nếu request Gemini đầu tiên gặp lỗi thật sự thì dừng,
+            // tránh tiếp tục gọi request thứ hai không cần thiết.
+            if (IsGeminiError(intentResult))
             {
-                KyThongKe = new
-                {
-                    Thang = thang,
-                    Nam = nam
-                },
+                return intentResult;
+            }
 
-                TongQuan = overview,
-                ChamCong = chamCong,
-                NghiPhep = nghiPhep,
-                QuyLuong = quyLuong,
-                HopDongSapHetHan = hopDong,
-                NhanVienTheoPhongBan = phongBan,
-                NhanVienTheoChucVu = chucVu,
-                NhanVienTheoTrangThai = trangThai
-            };
+            var intent = NormalizeIntent(intentResult);
 
-            // 5. Chuyển dữ liệu thành JSON
+            // =========================================================
+            // 4. BACKEND QUYẾT ĐỊNH DỮ LIỆU CẦN TRUY XUẤT
+            // Gemini chỉ phân tích ý định.
+            // Backend mới quyết định Service nào được gọi.
+            // =========================================================
+
+            object? duLieu;
+
+            switch (intent)
+            {
+                case "OVERVIEW":
+                    duLieu = await _thongKeService
+                        .GetOverviewAsync();
+                    break;
+
+                case "ATTENDANCE":
+                    duLieu = await _thongKeService
+                        .GetAttendanceByMonthAsync(thang, nam);
+                    break;
+
+                case "LEAVE":
+                    duLieu = await _thongKeService
+                        .GetLeaveByMonthAsync(thang, nam);
+                    break;
+
+                case "PAYROLL":
+                    duLieu = await _thongKeService
+                        .GetPayrollByMonthAsync(thang, nam);
+                    break;
+
+                case "CONTRACT":
+                    duLieu = await _thongKeService
+                        .GetExpiringContractsAsync();
+                    break;
+
+                case "DEPARTMENT":
+                    duLieu = await _thongKeService
+                        .GetEmployeesByDepartmentAsync();
+                    break;
+
+                case "POSITION":
+                    duLieu = await _thongKeService
+                        .GetEmployeesByPositionAsync();
+                    break;
+
+                case "STATUS":
+                    duLieu = await _thongKeService
+                        .GetEmployeesByStatusAsync();
+                    break;
+
+                default:
+                    return "Câu hỏi nằm ngoài phạm vi dữ liệu nhân sự mà hệ thống hiện hỗ trợ.";
+            }
+
+            // 5. Chuyển dữ liệu Backend vừa truy xuất thành JSON
             var duLieuNhanSu = JsonSerializer.Serialize(duLieu);
 
-            // 6. Gemini tự đọc câu hỏi + dữ liệu và trả lời
-            var prompt = $"""
+            // =========================================================
+            // GEMINI REQUEST #2: TẠO CÂU TRẢ LỜI
+            // =========================================================
+
+            var answerPrompt = $"""
             Bạn là trợ lý AI của hệ thống quản lý nhân sự.
 
-            Người dùng có thể đặt câu hỏi tự do bằng ngôn ngữ tự nhiên.
-            Hãy tự hiểu ý nghĩa của câu hỏi và trả lời dựa trên dữ liệu hệ thống được cung cấp.
+            Hãy trả lời câu hỏi của người dùng dựa trên dữ liệu thực tế
+            do Backend cung cấp bên dưới.
 
             Quy tắc bắt buộc:
-            - Chỉ sử dụng dữ liệu được cung cấp bên dưới.
+            - Chỉ sử dụng dữ liệu được cung cấp.
             - Không tự bịa số liệu hoặc thông tin.
-            - Nếu dữ liệu không đủ để trả lời, hãy nói rõ rằng dữ liệu hệ thống hiện chưa đủ.
+            - Nếu dữ liệu không đủ để trả lời, hãy nói rõ dữ liệu hệ thống hiện chưa đủ.
             - Không yêu cầu người dùng phải nhập đúng từ khóa.
-            - Có thể hiểu các cách diễn đạt tương đương về nhân sự, nhân viên, phòng ban,
-              chức vụ, chấm công, nghỉ phép, lương, hợp đồng và trạng thái làm việc.
-            - Nếu câu hỏi không liên quan đến dữ liệu nhân sự mà hệ thống hỗ trợ,
-              hãy trả lời rằng câu hỏi nằm ngoài phạm vi hỗ trợ của hệ thống.
             - Trả lời ngắn gọn, rõ ràng bằng tiếng Việt.
-            - Không tự động đưa ra quyết định nhân sự, khen thưởng, kỷ luật hoặc đánh giá hiệu suất.
+            - Không tự động đưa ra quyết định nhân sự, khen thưởng,
+              kỷ luật hoặc đánh giá hiệu suất.
+            - Không được giả định rằng bạn có quyền truy cập trực tiếp cơ sở dữ liệu.
 
-            Kỳ dữ liệu đang được cung cấp:
+            Ý định đã xác định:
+            {intent}
+
+            Kỳ dữ liệu:
             Tháng: {thang}
             Năm: {nam}
 
-            Dữ liệu hệ thống:
+            Dữ liệu thực tế do Backend cung cấp:
             {duLieuNhanSu}
 
             Câu hỏi của người dùng:
             {question}
             """;
 
-            return await SendToGeminiAsync(prompt, apiKey);
+            return await SendToGeminiAsync(
+                answerPrompt,
+                apiKey
+            );
         }
 
-        // Chỉ còn 1 lần gọi Gemini cho mỗi câu hỏi
+        // Chuẩn hóa kết quả request #1.
+        // Nếu Gemini lỡ trả thêm khoảng trắng, dấu ``` hoặc chữ thường,
+        // Backend vẫn cố gắng xử lý an toàn.
+        private string NormalizeIntent(string result)
+        {
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                return "UNKNOWN";
+            }
+
+            var value = result
+                .Trim()
+                .Replace("```", "")
+                .Replace("\"", "")
+                .Trim()
+                .ToUpperInvariant();
+
+            string[] validIntents =
+            {
+                "OVERVIEW",
+                "ATTENDANCE",
+                "LEAVE",
+                "PAYROLL",
+                "CONTRACT",
+                "DEPARTMENT",
+                "POSITION",
+                "STATUS",
+                "UNKNOWN"
+            };
+
+            // Trường hợp lý tưởng: Gemini trả đúng 1 từ.
+            if (validIntents.Contains(value))
+            {
+                return value;
+            }
+
+            // Fallback nếu Gemini vẫn trả thêm một ít nội dung.
+            foreach (var intent in validIntents)
+            {
+                if (Regex.IsMatch(
+                    value,
+                    $@"\b{Regex.Escape(intent)}\b",
+                    RegexOptions.IgnoreCase))
+                {
+                    return intent;
+                }
+            }
+
+            return "UNKNOWN";
+        }
+
+        // Phân biệt lỗi gọi Gemini với intent UNKNOWN.
+        private bool IsGeminiError(string result)
+        {
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                return true;
+            }
+
+            return result.StartsWith(
+                       "Gemini hiện đã đạt giới hạn sử dụng",
+                       StringComparison.OrdinalIgnoreCase)
+                   ||
+                   result.StartsWith(
+                       "Không thể kết nối Gemini",
+                       StringComparison.OrdinalIgnoreCase)
+                   ||
+                   result.StartsWith(
+                       "Có lỗi xảy ra khi xử lý câu hỏi bằng Gemini",
+                       StringComparison.OrdinalIgnoreCase)
+                   ||
+                   result.StartsWith(
+                       "Gemini không trả về nội dung",
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Hàm dùng chung cho cả 2 request Gemini
         private async Task<string> SendToGeminiAsync(
             string prompt,
             string apiKey)
@@ -178,7 +323,10 @@ namespace QuanLyNhanSu.API.Services
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
             );
 
-            request.Headers.Add("x-goog-api-key", apiKey);
+            request.Headers.Add(
+                "x-goog-api-key",
+                apiKey
+            );
 
             request.Content = new StringContent(
                 json,
@@ -210,18 +358,59 @@ namespace QuanLyNhanSu.API.Services
                 using var document =
                     JsonDocument.Parse(responseContent);
 
-                var text = document.RootElement
-                    .GetProperty("candidates")[0]
-                    .GetProperty("content")
-                    .GetProperty("parts")[0]
-                    .GetProperty("text")
-                    .GetString();
+                var root = document.RootElement;
 
-                return text ?? "Gemini không trả về nội dung.";
+                // Kiểm tra cấu trúc response trước khi đọc
+                // để tránh exception nếu Gemini trả response bất thường.
+                if (!root.TryGetProperty("candidates", out var candidates)
+                    || candidates.GetArrayLength() == 0)
+                {
+                    return "Gemini không trả về nội dung.";
+                }
+
+                var candidate = candidates[0];
+
+                if (!candidate.TryGetProperty("content", out var content)
+                    || !content.TryGetProperty("parts", out var parts)
+                    || parts.GetArrayLength() == 0)
+                {
+                    return "Gemini không trả về nội dung.";
+                }
+
+                var part = parts[0];
+
+                if (!part.TryGetProperty("text", out var textElement))
+                {
+                    return "Gemini không trả về nội dung.";
+                }
+
+                var text = textElement.GetString();
+
+                return string.IsNullOrWhiteSpace(text)
+                    ? "Gemini không trả về nội dung."
+                    : text;
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine(
+                    $"Gemini HTTP exception: {ex.Message}"
+                );
+
+                return "Có lỗi xảy ra khi kết nối Gemini.";
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine(
+                    $"Gemini JSON exception: {ex.Message}"
+                );
+
+                return "Có lỗi xảy ra khi xử lý phản hồi từ Gemini.";
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Gemini exception: {ex.Message}");
+                Console.WriteLine(
+                    $"Gemini exception: {ex.Message}"
+                );
 
                 return "Có lỗi xảy ra khi xử lý câu hỏi bằng Gemini.";
             }
